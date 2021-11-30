@@ -7,11 +7,13 @@ from selenium.webdriver.common.action_chains import ActionChains
 from typing import List
 from selenium.common.exceptions import NoSuchElementException        
 from time import sleep
-import pyperclip
-username = 'TABEXTEND_EMAIL'
-password = 'TABEXTEND_PASSWORD'
+from dotenv import dotenv_values
+
+config = dotenv_values('.env')
 
 
+username = config.get('USERNAME')
+password = config.get('PASSWORD')
 class Item:
     position: str
     name: str
@@ -42,7 +44,6 @@ class Group:
     def list_items (self):
         return '\n'.join(map(str, self.items))
     
-    def get_all_groups_by_category(self, category: str):
     
     def __init__(self, position: str, name: str):
         self.position = position
@@ -112,8 +113,8 @@ def get_all_groupnames(category:str= None):
     xpath = f'/html/body/div[1]/div[1]/div[2]/div[2]/div/div[{x}]/div[1]/div/div[1]/div/div[2]/div/span'
     while (check_exists_by_xpath(xpath)):
         groupnames.append(get_groupname(x))
-        xpath = f'/html/body/div[1]/div[1]/div[2]/div[2]/div/div[{x}]/div[1]/div/div[1]/div/div[2]/div/span'
         x += 1
+        xpath = f'/html/body/div[1]/div[1]/div[2]/div[2]/div/div[{x}]/div[1]/div/div[1]/div/div[2]/div/span'
     return groupnames
         
     
@@ -126,7 +127,6 @@ def get_all_items_from_group(group_id: str):
             v=driver.find_element(By.XPATH, xpath).get_attribute('innerHTML')
             i = Item( position=str(x), name=v, group_name=get_groupname(group_id))
             items.append(i)
-            x += 1
             x+=1
     except NoSuchElementException:
         print (items)
