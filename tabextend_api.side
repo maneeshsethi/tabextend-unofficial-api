@@ -1,0 +1,21 @@
+{
+  "id": "8a01562f-a628-4ab4-90dd-763b1872788e",
+  "version": "2.0",
+  "name": "tabextend_api",
+  "url": "",
+  "tests": [{
+    "id": "dd1092f5-1d1e-47bb-8380-b6ae1824800a",
+    "name": "Untitled",
+    "commands": []
+  }],
+  "suites": [{
+    "id": "e7a99ee0-689b-4685-8626-898f995a1c7f",
+    "name": "Default Suite",
+    "persistSession": false,
+    "parallel": false,
+    "timeout": 300,
+    "tests": ["dd1092f5-1d1e-47bb-8380-b6ae1824800a"]
+  }],
+  "urls": [],
+  "plugins": []
+}
