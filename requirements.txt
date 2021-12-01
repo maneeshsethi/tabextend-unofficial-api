@@ -1,2 +1,4 @@
 python-dotenv
 selenium
+fastapi
+uvicorn[standard]
