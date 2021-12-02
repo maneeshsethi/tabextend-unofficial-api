@@ -7,11 +7,12 @@ from selenium.webdriver.common.action_chains import ActionChains
 from typing import List
 from selenium.common.exceptions import NoSuchElementException        
 from selenium.webdriver.common.keys import Keys
-
+import webbrowser
 from time import sleep
 from dotenv import dotenv_values
 
 from pydantic import BaseModel
+from enum import Enum
 
 config = dotenv_values('.env')
 username = config.get('USERNAME')
@@ -27,6 +28,14 @@ app = FastAPI()
 async def root():
     return {"message": "Hello World"}
 
+
+class ItemActions(str, Enum):
+    note = "note"
+    todo = "todo"
+    completed_todo = "completed_todo"
+    incomplete_todo="incomplete_todo"
+    color="color"
+    delete="delete"
 
 class Item(BaseModel):
     position: str
@@ -74,15 +83,22 @@ class Category(BaseModel):
         self.name = name
 
 options = Options()
-options.headless = True
+options.headless = False 
 options.add_extension('./tabextend.crx')
-options.add_argument("--window-size=1920,1200")
+
+options.add_argument("--window-size=800,600")
 
 
 DRIVER_PATH = './chromedriver'
 driver = webdriver.Chrome(options=options, executable_path=DRIVER_PATH)
+#driver.minimize_window()
+
 #driver.get('https://www.tabextend.com/auth/signout')
 driver.get('chrome-extension://ffikidnnejmibopbgbelephlpigeniph/index.html');
+actions = ActionChains(driver)
+
+def reset_selector():
+        x = driver.find_element(By.XPATH,'/html/body/div[1]/div[1]/div[2]/div[1]/div/div[1]').click()        
 
 
 
@@ -102,7 +118,11 @@ def check_exists_by_id(id):
 
 @app.get('/login')
 def login(username=username, password=password):
+        print ("in login function")
         while not check_exists_by_xpath("//p[contains(.,'Log in')]"):
+            print ("login not found")
+            
+
             sleep(3)
             #return 'Already logged in'
         
@@ -112,10 +132,13 @@ def login(username=username, password=password):
             passw = driver.find_element(By.XPATH, '//input[@type="password"]').send_keys(password)
             button = driver.find_element(By.XPATH, '//button[@type="submit"]').click()
             #TODO check if login was successful
-            return "Login Successful"
+            print("Login successful")
+            #return "Login Successful"
+            #webbrowser.open('http://localhost:8000/docs', new=2)
         except:
             #TODO handle bad username/pass
-            return "Bad username/password"
+            print("Bad username/password")
+            #return "Bad username/password"
   
 
 @app.get('/get_groupname/{group_id}')
@@ -178,6 +201,141 @@ def is_logged_in():
         return False
     return True
 
+@app.post('/add_item/{group_id}/{text}')
+@app.post('/add_item/{text}')
+def add_item(group_id:str, text:str,):
+    #xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[1]/div/div[2]/div/div[last()]'     
+    #divcontent=driver.find_element(By.XPATH, xpath)
+    divcontent2=driver.find_element(By.XPATH, '/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[1]/div/div[2]/div/div[last()]').click()
+    actions.send_keys(f'{text}\n')
+    actions.perform()
+    print ("item added")
+    reset_selector()
+    return "Item added"
+   
+def select_item(group_id: str, item_id: str):
+    xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[' + str(group_id)+ ']/div/div[2]/div/div[' + str(item_id)+ ']/div/div'
+    divcontent=driver.find_element(By.XPATH, xpath).click()
+    
+    
+@app.post('/do_item_action/{group_id}/{item_id}/{action}')
+def do_item_action(group_id: str, item_id, action: ItemActions):
+    select_item(group_id, item_id)
+    y=driver.find_element(By.CLASS_NAME, 'css-bma6qi')
+    
+    note=y.find_element(By.XPATH,'.//button[1]')
+    todo=y.find_element(By.XPATH,'.//button[2]')
+    color=y.find_element(By.XPATH,'.//button[3]')
+    delete=y.find_element(By.XPATH,'.//button[6]')
+    
+    try:
+        if action == "note":
+            note.click()
+        elif action == "todo":
+            todo.click()
+        elif action == "completed_todo":
+            todo.click()
+            mark_checkbox_todo(group_id, item_id, 1)
+        elif action == "incomplete_todo":
+            todo.click()
+            mark_checkbox_todo(group_id, item_id, 0)
+        elif action == "color":
+            pass
+        elif action == "delete":
+            delete.click()
+        else:
+            reset_selector()
+            return "No Such Action"
+    except:
+        
+        sleep(4)
+        if action == "note":
+            note.click()
+        elif action == "todo":
+            todo.click()
+        elif action == "color":
+            pass
+        elif action == "delete":
+            delete.click()
+        else:
+            reset_selector()
+            return "No Such Action"        
+
+    
+    reset_selector()
+    return "Action complete"
+   
+
+def get_element(group_id: str, item_id: str):
+    xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[' + str(group_id)+ ']/div/div[2]/div/div[' + str(item_id)+ ']/div/div'
+    divcontent=driver.find_element(By.XPATH, xpath)
+    print(xpath)
+    return divcontent
+
+@app.get('/get_todo_state/{group_id}/{item_id}')
+def get_todo_state(group_id: str, item_id: str):
+    if get_item_type(group_id,item_id) != "todo":
+        return "Not a todo"
+    
+    elem = get_element(group_id,item_id)
+    t=elem.find_element(By.XPATH, ".//textarea")
+    tz = t.value_of_css_property("text-decoration")
+    print (tz)
+    if tz.find('line-through') != 0:
+        return 'incomplete'
+    else:
+        return 'complete'
+
+
+@app.post('/mark_checkbox_todo/{group_id}/{item_id}')
+@app.post('/mark_checkbox_todo/{group_id}/{item_id}/{completed}')
+def mark_checkbox_todo(group_id: str, item_id: str, completed: bool=None):
+    
+    if (get_item_type(group_id, item_id) != "todo"):
+        return "Item is not a todo"
+    state = get_todo_state(group_id, item_id)
+    print (f'original state is {state}')
+    print(f'requested state is {completed}')
+    
+    if state == 'complete':
+        state = True
+    else:
+        state = False
+    xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[' + str(group_id)+ ']/div/div[2]/div/div[' + str(item_id)+ ']/div/div/button'   
+    if completed is None:
+        print("swap state regardless of original state")
+        divcontent=driver.find_element(By.XPATH, xpath).click() 
+    else:
+        if state ==completed:
+            print(f'element value is {state}, no change made')    
+        else:
+            divcontent=driver.find_element(By.XPATH, xpath).click() 
+            print(f'element value is now {state}, change made')        
+    reset_selector()
+    reset_selector()
+    return(get_todo_state(group_id, item_id))
+             
+    
+
+@app.get('/get_item_type/{group_id}/{item_id}')
+def get_item_type(group_id: str, item_id: str):
+    items = []
+    try:      
+        xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[' + str(group_id)+ ']/div/div[2]/div/div[' + str(item_id)+ ']/div/div'
+        divcontent=driver.find_element(By.XPATH, xpath).get_attribute('innerHTML')
+        if divcontent.find('<button') == 0:
+            return "todo"
+        else:
+            return "note or link"
+            
+#        group_name=get_groupname(group_id)
+#        i = Item( position=str(x), name=v, group_name=group_name)
+#        items.append(i)
+#        x+=1
+    except NoSuchElementException:
+        print (items)
+        return items
+    
     
 login()
 sleep(4)
