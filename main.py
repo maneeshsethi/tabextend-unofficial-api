@@ -13,7 +13,7 @@ from dotenv import dotenv_values
 
 from pydantic import BaseModel
 from enum import Enum
-
+import pprint
 config = dotenv_values('.env')
 username = config.get('USERNAME')
 password = config.get('PASSWORD')
@@ -38,13 +38,17 @@ class ItemActions(str, Enum):
     delete="delete"
 
 class Item(BaseModel):
-    position: str
-    name: str
-    group_name: str
+    position: str = None 
+    name: str = None 
+    group_name: str = None
+    type : str = None
+    completed : bool = None 
     
-    def __str__(self):
-        return f'{self.position} - {self.name} (Group: {self.group_name})'
-    
+ 
+        
+#    def __str__(self):
+#        return f'{self.position} - {self.name} (Group: {self.group_name})'
+#         return pprint.p
     def __repr__(self):
         return self.__str__()
     
@@ -161,26 +165,49 @@ def get_all_groupnames(category:str= None):
         xpath = f'/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[{x}]/div/div[1]/div/div[2]/div/span'
     return groupnames
         
+@app.get('/get_item/{group_id}/{item_id}')
+def get_item(group_id: str , item_id: str):
+    
+    try: 
+        elem = get_element(group_id, item_id)
+    except:
+        print( "Item not found")
+        return None
+    
+    item = Item()
+    item.position = item_id
+    item.name = elem.text
+    item.type = get_item_type(group_id, item_id)
+    if (item.type == "todo"):
+        item.completed = get_todo_state(group_id,item_id) 
+    item.group_name = get_groupname(group_id)
+    return item
+
+        
+        
+    
     
 @app.get('/get_all_items/{group_id}')
 def get_all_items_from_group(group_id: str):
     items = []
     x=1
-    try:
-        while (True):
-            xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[' + str(group_id)+ ']/div/div[2]/div/div[' + str(x)+ ']/div/div/div/div/textarea'
-            v=driver.find_element(By.XPATH, xpath).get_attribute('innerHTML')
-            group_name=get_groupname(group_id)
-            i = Item( position=str(x), name=v, group_name=group_name)
-            items.append(i)
-            x+=1
-    except NoSuchElementException:
-        print (items)
-        return items
+    while (True):
+        # xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[' + str(group_id)+ ']/div/div[2]/div/div[' + str(x)+ ']/div/div/div/div/textarea'
+        # v=driver.find_element(By.XPATH, xpath).get_attribute('innerHTML')
+        # group_name=get_groupname(group_id)
+        # i = Item( position=str(x), name=v, group_name=group_name)
+        i = get_item(group_id, str(x))
+        if i is None:
+            break
+        items.append(i)
+        x+=1
+    return items
+
 @app.get('/get_all_items')
 def get_all_items():
     all_items = {}
     group_position = 1
+    
     xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[' + str(group_position)+ ']/div/div[2]/div/div[1]/div/div/div/div/textarea'
 
     while (check_exists_by_xpath(xpath)):
@@ -269,7 +296,7 @@ def do_item_action(group_id: str, item_id, action: ItemActions):
 def get_element(group_id: str, item_id: str):
     xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[' + str(group_id)+ ']/div/div[2]/div/div[' + str(item_id)+ ']/div/div'
     divcontent=driver.find_element(By.XPATH, xpath)
-    print(xpath)
+    #print(xpath)
     return divcontent
 
 @app.get('/get_todo_state/{group_id}/{item_id}')
@@ -280,7 +307,7 @@ def get_todo_state(group_id: str, item_id: str):
     elem = get_element(group_id,item_id)
     t=elem.find_element(By.XPATH, ".//textarea")
     tz = t.value_of_css_property("text-decoration")
-    print (tz)
+    #print (tz)
     if tz.find('line-through') != 0:
         return 'incomplete'
     else:
