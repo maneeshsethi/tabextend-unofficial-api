@@ -73,22 +73,21 @@ class Group(BaseModel):
         self.items = []
     
 class Category(BaseModel):
-    position: str
-    name: str
+
+    name: str = None
+    position: str = None
     
-    def __str__(self):
-        return f'{self.position} - {self.name}'
+ #   def __str__(self):
+#        return f'{self.position} - {self.name}'
     
-    def __repr__(self):
-        return self.__str__()
+#    def __repr__(self):
+#        return self.__str__()
         
-    def __init__(self, position: str, name: str):
-        self.position = position
-        self.name = name
+
 
 options = Options()
 options.headless = False 
-options.add_extension('./tabextend.crx')
+options.add_extension('./tabExtend.crx')
 
 options.add_argument("--window-size=800,600")
 
@@ -104,7 +103,22 @@ actions = ActionChains(driver)
 def reset_selector():
         x = driver.find_element(By.XPATH,'/html/body/div[1]/div[1]/div[2]/div[1]/div/div[1]').click()        
 
+def get_current_category():
+    categories = driver.find_elements(By.XPATH, '/html/body/div[1]/div[1]/div[2]/div[1]/div/div')
+    #   for i in range (1, driver.find_elements(By.XPATH, '/html/body/div[1]/div[1]/div[2]/div[1]/div/div')):
+    x=0
+    for c in categories:
+        c.click()
+        x  = x + 1
+        if c.value_of_css_property('z-index') == '2':
+            ret = Category(name=c.text, position=x)
+            ret.name = c.text
+            ret.position = x
+            return Category( name=c.text, position=x)
 
+def set_category(category:int):
+    categories = driver.find_elements(By.XPATH, '/html/body/div[1]/div[1]/div[2]/div[1]/div/div')
+    categories[category-1].click()       
 
 def check_exists_by_xpath(xpath):
     try:
@@ -228,9 +242,10 @@ def is_logged_in():
         return False
     return True
 
+@app.post('/add_item')
 @app.post('/add_item/{group_id}/{text}')
 @app.post('/add_item/{text}')
-def add_item(group_id:str, text:str,):
+def add_item(text:str,group_id:str = 1):
     #xpath='/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[1]/div/div[2]/div/div[last()]'     
     #divcontent=driver.find_element(By.XPATH, xpath)
     divcontent2=driver.find_element(By.XPATH, '/html/body/div[1]/div[1]/div[2]/div[2]/div/div[1]/div[1]/div/div[2]/div/div[last()]').click()
